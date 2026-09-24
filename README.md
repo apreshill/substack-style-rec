@@ -1,6 +1,6 @@
 # Substack TV-Style Video Recommendation Engine
 
-A production-ready demo of Netflix-style video discovery for creator platforms, powered by [Twelve Labs](https://www.twelvelabs.io/) multimodal video understanding and [Pixeltable](https://www.pixeltable.com/) declarative data infrastructure.
+A production-ready demo of Netflix-style video discovery for creator platforms, powered by [Twelve Labs](https://www.twelvelabs.io/) multimodal video understanding and [Pixeltable](https://www.pixeltable.com/) multimodal backend.
 
 **[Read the tutorial: Building Cross-Modal Video Search with TwelveLabs and Pixeltable](https://www.twelvelabs.io/blog/twelve-labs-and-pixeltable)**
 
@@ -29,12 +29,12 @@ FastAPI Backend (localhost:8000)
   └── POST /api/search                    ← multimodal: image/video/audio upload
        |
        v
-Pixeltable
+Pixeltable (schema in backend/app.py)
   ├── creators table (10 creators)
-  ├── videos table (25 videos + pxt.Video + scene detection + topic/style/tone)
-  ├── video_scenes view (scene_detect_histogram + video_splitter mode=fast)
-  ├── scene_marengo embedding index (multimodal video content per scene)
-  └── title_marengo embedding index (text fallback)
+  ├── videos table (25 videos + pxt.Video + scene cut times + topic/style/tone)
+  ├── video_scenes view (one clip per scene, video_splitter mode=fast)
+  ├── scene embedding index on video_segment
+  └── title embedding index (text fallback)
        |
        v
 Twelve Labs API
@@ -48,11 +48,12 @@ Two integration patterns, one data plane — see [Integration patterns](#integra
 
 [Pixeltable](https://docs.pixeltable.com/) is the data layer that makes this possible with minimal code:
 
-- **Declarative schema** -- Define tables, computed columns, and embedding indexes. Pixeltable handles the rest.
+- **Declarative schema** -- Tables, computed columns, and embedding indexes are Python classes in `backend/app.py`, applied with `pxt schema update`.
 - **Automatic pipelines** -- INSERT a video row and embeddings + attribute extraction run automatically as computed columns. No orchestration code.
-- **Scene detection** -- `scene_detect_histogram()` automatically finds natural scene boundaries. `video_splitter(mode='fast')` splits at those points with stream copy (no re-encoding). Each scene gets its own Marengo 3.0 embedding.
-- **`.similarity()` API** -- One-line cross-modal search: `video_scenes.video_segment.similarity(string="AI technology")` finds videos by actual scene content. Recommendations go a step further and reuse the *stored* scene vectors — `.similarity(vector=video_segment.embedding(idx="scene_marengo"))` — for true video-to-video matching with **no re-embedding at query time** (each scene was already embedded at setup). Powered by pgvector under the hood.
-- **`pxt.Video` column** -- Store video files directly in the table. Scene detection + embedding run automatically as computed columns on insert.
+- **Incremental index** -- Pixeltable embeds and indexes only new scenes on insert, and drops them on delete. The index is never rebuilt.
+- **Scene clips** -- Scene cut times are a computed column on each video. The `VideoScenes` view splits the video at those times with `video_splitter(mode='fast')` (stream copy, no re-encoding). Each clip gets its own Marengo 3.0 embedding.
+- **`.similarity()` API** -- One-line cross-modal search: `video_scenes.video_segment.similarity(string="AI technology")` finds videos by actual scene content. Recommendations go a step further and reuse the *stored* scene vectors — `.similarity(vector=video_segment.embedding())` — for true video-to-video matching with **no re-embedding at query time** (each scene was already embedded at setup). Powered by pgvector under the hood.
+- **`pxt.Video` column** -- Store video files directly in the table. Cut times and embeddings run automatically as computed columns on insert.
 
 See the [Pixeltable + Twelve Labs integration docs](https://docs.pixeltable.com/sdk/latest/twelvelabs) for the full API reference.
 
@@ -70,7 +71,7 @@ This backend deliberately uses both of Pixeltable's interop modes against the sa
 
 | Pattern | Used for | Where it lives | What it looks like |
 |---|---|---|---|
-| **Pixeltable integration** (declarative) | Embed API v2 (Marengo 3.0) | `backend/setup_pixeltable.py` | `from pixeltable.functions.twelvelabs import embed` → `videos.add_embedding_index(..., string_embed=embed.using(model_name="marengo3.0"))`. Pixeltable handles auth, batching, retries, and rerunning on new rows. |
+| **Pixeltable integration** (declarative) | Embed API v2 (Marengo 3.0) | `backend/app.py` | `marengo = pxtf.twelvelabs.embed.using(model_name="marengo3.0")`, then `pxt.EmbeddingIndex(title, string_embed=marengo)` in `__indexes__`. Video clips go through `embed_video_retry` in `functions.py`. Pixeltable handles auth, batching, retries, and rerunning on new rows. |
 | **Bring-your-own API** (direct HTTP, wrapped as a UDF) | Analyze API | `backend/functions.py` | `@pxt.udf def analyze_video(...)` calls `https://api.twelvelabs.io/v1.3/analyze` with `httpx` and returns a dict. Pixeltable still schedules it as a computed column so the output (topic / style / tone) is cached on the row. |
 
 **Why the split is not just cosmetic.** Pixeltable ships a first-class [Twelve Labs integration](https://docs.pixeltable.com/sdk/latest/twelvelabs) for the Embed API, so we use it — one line replaces dozens of lines of batching, retry, and vector-persistence code. The Analyze API does not have a Pixeltable helper yet (it's tied to the per-video index abstraction, not a stateless model call), so we drop down to raw HTTP and wrap it in a UDF. Either way the result is a computed column: if you INSERT a new video, both the embedding index *and* `raw_attributes` recompute automatically, regardless of which pattern produced them.
@@ -93,7 +94,7 @@ This is the thing to steal from this repo if you're evaluating Pixeltable: integ
 ### Prerequisites
 
 - Node.js 18+
-- Python 3.10+
+- Python 3.11+
 - A [Twelve Labs API key](https://playground.twelvelabs.io/)
 
 ### 1. Frontend
@@ -114,10 +115,11 @@ TWELVELABS_API_KEY=tlk_your_key_here
 TWELVELABS_INDEX_ID=69c37b6708cd679f8afbd748
 EOF
 
-uv sync                        # Install deps from lockfile
-uv run download_videos.py      # Download 3 quick-start videos from YouTube (~2 min)
-uv run setup_pixeltable.py     # Schema + scene detection + Marengo embeddings (~4 min)
-uv run main.py                 # FastAPI on localhost:8000
+uv sync                                    # Install deps from lockfile
+uv run download_videos.py                  # Download 3 quick-start videos from YouTube (~2 min)
+uv run pxt schema update app.py substack_rec  # Create tables, view, and indexes
+uv run load.py                             # Insert rows; embeddings run on insert (~4 min)
+uv run main.py                             # FastAPI on localhost:8000
 
 # On cloud hosts (Render, AWS, etc.) where YouTube blocks yt-dlp, use the R2 mirror:
 #   uv run download_videos.py --r2
@@ -130,7 +132,8 @@ uv run main.py                 # FastAPI on localhost:8000
 
 # For the full 25-video dataset (13GB download, ~30 min setup):
 uv run download_videos.py --full
-uv run setup_pixeltable.py --full
+uv run pxt schema update app.py substack_rec
+uv run load.py --full
 ```
 
 ### 3. Connect frontend to backend
@@ -146,7 +149,7 @@ Without this, the browser talks to the Next.js `/api/*` routes instead of FastAP
 ### Run order (follow once per machine)
 
 1. **Backend env** — `backend/.env.local` with `TWELVELABS_API_KEY` and `TWELVELABS_INDEX_ID` (`backend/.env` also works; `config.py` reads both). Optional: `PIXELTABLE_HOME=./data` so Pixeltable data lives under `backend/data/`.
-2. **Install & load data** — From `backend/`: `uv sync`, then `uv run download_videos.py` (or `--full`; add `--r2` on cloud hosts where YouTube blocks yt-dlp), then `uv run setup_pixeltable.py` (matching `--full` if you used it). Skipping download/setup leaves empty tables or no `video_scenes` view.
+2. **Install & load data** — From `backend/`: `uv sync`, then `uv run download_videos.py` (or `--full`; add `--r2` on cloud hosts where YouTube blocks yt-dlp), then `uv run pxt schema update app.py substack_rec` and `uv run load.py` (matching `--full` if you used it). Skipping download or load leaves empty tables or no `video_scenes` view.
 3. **Root env** — Repo root `.env.local` with `NEXT_PUBLIC_API_BASE=http://localhost:8000/api` as above.
 4. **Run two processes** — Terminal A: `cd backend && uv run main.py` (port 8000). Terminal B: repo root `npm run dev` (port 3000).
 
@@ -158,7 +161,7 @@ The repo ships a [`render.yaml`](./render.yaml) Blueprint for the backend and a 
 
 ### The one thing to understand first
 
-Pixeltable is **stateful**. It runs an embedded Postgres (`pixeltable_pgserver`) that writes to `PIXELTABLE_HOME`, plus video files on local disk. Render web services have an **ephemeral filesystem by default**, so the backend service needs a **[Render Persistent Disk](https://render.com/docs/disks)** mounted at `PIXELTABLE_HOME`. Without it you'd re-run the ~30-minute `setup_pixeltable.py --full` on every deploy and re-burn Twelve Labs Analyze credits. The Blueprint handles this — don't strip the `disk:` block.
+Pixeltable is **stateful**. It runs an embedded Postgres (`pixeltable_pgserver`) that writes to `PIXELTABLE_HOME`, plus video files on local disk. Render web services have an **ephemeral filesystem by default**, so the backend service needs a **[Render Persistent Disk](https://render.com/docs/disks)** mounted at `PIXELTABLE_HOME`. Without it you'd re-run the ~30-minute `load.py --full` on every deploy and re-burn Twelve Labs Analyze credits. The Blueprint handles this — don't strip the `disk:` block.
 
 ### 1. Backend → Render
 
@@ -178,7 +181,8 @@ Pixeltable is **stateful**. It runs an embedded Postgres (`pixeltable_pgserver`)
 4. **One-time data load**: open the Render **Shell** tab on the service and run:
    ```bash
    uv run download_videos.py --r2 --full
-   uv run setup_pixeltable.py --full
+   uv run pxt schema update app.py substack_rec
+   uv run load.py --full
    ```
    `--r2` downloads from a Cloudflare R2 mirror instead of YouTube (yt-dlp is blocked on cloud IPs). This writes pgdata + video files to `/var/pixeltable`, which persists across redeploys. Drop `--full` for the 3-video quick-start (~4 min vs ~30 min).
 5. Subsequent deploys just reconnect (`lifespan` in `main.py` logs "Connected to Pixeltable schema") — setup does **not** re-run.
@@ -230,8 +234,8 @@ The disk-vs-no-disk decision is what you're choosing. Everything else is plumbin
 
 ```
 ├── src/                          # Next.js frontend
-│   ├── app/                      # Pages: /, /explore, /search, /watch/:id, /creator/:id
-│   ├── lib/api.ts                # API client (8 fetch helpers)
+│   ├── app/                      # Pages: /, /explore, /search, /how-it-works, /watch/:id, /creator/:id
+│   ├── lib/api.ts                # API client (9 fetch helpers)
 │   ├── lib/types.ts              # Video, Creator, Recommendation, UserState
 │   └── components/               # VideoCard, VideoRow, VideoPlayer, etc.
 │
@@ -241,7 +245,9 @@ The disk-vs-no-disk decision is what you're choosing. Everything else is plumbin
 │   ├── models.py                 # Pydantic models (camelCase JSON)
 │   ├── functions.py              # analyze_video UDF + generate_reason
 │   ├── download_videos.py        # Download video files: YouTube (default) or R2 mirror (--r2 for cloud hosts)
-│   ├── setup_pixeltable.py       # Schema + scene detection + Marengo embeddings + TL ingest
+│   ├── app.py                    # Class-based schema: tables, view, computed columns, embedding indexes
+│   ├── load.py                   # Insert videos from the TwelveLabs index
+│   ├── run_setup_logged.sh       # Optional: drop this app's dir, schema update, then load.py
 │   └── routers/                  # videos, creators, recommendations, search
 │
 ├── scripts/                      # Content curation + metadata CSVs
