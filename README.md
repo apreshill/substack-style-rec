@@ -13,7 +13,7 @@ Creator platforms like Substack TV, UScreen, and Kajabi need recommendation engi
 - **Cross-creator discovery** -- Search "music culture" returns Vox Earworm videos about jazz, Stravinsky, and fade-outs -- semantic understanding, not keyword matching
 - **70/30 subscription/discovery balance** -- Familiar content from creators you follow, blended with algorithmically-surfaced new voices
 
-## How it works
+## How it works 
 
 ```
 Next.js Frontend (localhost:3000)
