@@ -19,10 +19,10 @@ const TIPS: Record<string, string> = {
     "Computed columns that run user-defined functions (UDFs) and call external APIs on insert. Only new rows are computed.",
   query:
     "Similarity search via .similarity() and filtering. Uses pgvector under the hood.",
-  "Twelve Labs":
-    "Queries use Pixeltable's built-in Marengo embed. Analyze and scene video embeds are custom user-defined functions (UDFs) in functions.py. Both are stored as computed columns.",
+  TwelveLabs:
+    "Queries use Pixeltable's built-in Marengo embed. Analyze and scene video embeds are custom user-defined functions (UDFs) in functions.py. Analyze results are a computed column, and the scene embedding is the embedding index's embedding function.",
   embed:
-    "Embed API v2 with Marengo 3.0. Returns 512-dim vectors that capture the visual content of each scene.",
+    "Embed API v2 with Marengo 3.0. Stores one 512-dimension vector for each scene clip.",
   analyze:
     "Analyze API extracting structured attributes: topic, style, and tone from video content.",
 };
@@ -381,7 +381,7 @@ export default function ArchitectureDiagram() {
                   <div className="flex flex-col items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] p-2.5 text-center">
                     <CpuIcon className="mb-1 w-3.5 h-3.5 text-[var(--text-secondary)]" />
                     <span className="text-[11px] font-semibold text-[var(--text-primary)]">
-                      orchestration
+                      AI steps
                     </span>
                     <span className="mt-0.5 text-[10px] leading-snug text-[var(--text-tertiary)]">
                       computed columns
@@ -408,10 +408,10 @@ export default function ArchitectureDiagram() {
           {/* RIGHT: external */}
           <Zone title="external" className="flex-1">
             <DiagNode
-              label="Twelve Labs"
+              label="TwelveLabs"
               sub="video embeddings"
               icon={TwelveLabsLogo}
-              tip={TIPS["Twelve Labs"]}
+              tip={TIPS.TwelveLabs}
             >
               <div className="mt-1 flex items-center justify-center gap-1.5">
                 <Pill label="embed" />
@@ -423,7 +423,8 @@ export default function ArchitectureDiagram() {
 
             <div className="text-center text-[10px] leading-snug text-[var(--text-tertiary)]">
               Queries use the built-in Marengo embed. Analyze and scene video
-              embeds are custom user-defined functions (UDFs), both stored as computed columns.
+              embeds are custom user-defined functions (UDFs). Analyze results are a
+              computed column, and scene embeds run inside the embedding index.
             </div>
           </Zone>
         </div>

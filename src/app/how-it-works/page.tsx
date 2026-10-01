@@ -216,8 +216,9 @@ export default function HowItWorksPage() {
           An AI video discovery app with subscriptions, search, and a
           &ldquo;because you watched&hellip;&rdquo; feed. TwelveLabs models create the
           embeddings and tags for each video. Pixeltable stores the embeddings and
-          tags with the videos, and searches the embeddings to answer every search
-          and recommendation.
+          tags in each video&apos;s row, next to a reference to the source MP4, and
+          searches the embeddings to answer every search and recommendation.
+          Playback streams from the TwelveLabs index.
         </p>
 
         <div className="flex flex-wrap gap-2 mb-6">
@@ -265,7 +266,8 @@ export default function HowItWorksPage() {
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                   TwelveLabs builds models for video understanding. This app uses two of
                   them. Marengo 3.0 creates an embedding for each scene clip and for each
-                  search query, so a search can find a specific moment in a video. Pegasus
+                  search query, so a search can match on what happens inside a video, not
+                  just its title. Pegasus
                   1.5, called through the Analyze API, returns the topic, style, and tone
                   of each full video.
                 </p>
@@ -297,17 +299,19 @@ export default function HowItWorksPage() {
                   </h3>
                 </div>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-3">
-                  Without Pixeltable, this app would need a blob store for the videos, a
-                  vector database for the embeddings, an orchestrator to call TwelveLabs,
+                  Without Pixeltable, this app would need storage for the scene clips, a
+                  vector database for the embeddings, a job runner to call TwelveLabs,
                   and glue code to keep them in sync. With Pixeltable, adding a video is
                   one insert, and the embeddings and tags follow.
                 </p>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                   Pixeltable is an open source multimodal backend for Python, from the
                   creators of Apache Parquet and Impala (Apache 2.0
-                  license). In this app, the videos, embeddings, and Analyze results are
-                  stored in Pixeltable tables. When you insert a video, Pixeltable calls
-                  Marengo and the Analyze API and adds the new scenes to the index.
+                  license). In this app, Pixeltable stores each video&apos;s row, the
+                  Analyze results, the scene clips, and the embeddings. It references the
+                  source MP4 instead of copying it, and playback streams from the
+                  TwelveLabs index. When you insert a video, Pixeltable calls Marengo and
+                  the Analyze API and adds the new scenes to the index.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium">
                   <a
@@ -346,13 +350,13 @@ export default function HowItWorksPage() {
               heading="From a video file to a recommendation"
             />
             <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-2xl">
-              Pixeltable is the backend. It stores the videos and the TwelveLabs
-              results, keeps them up to date as videos are added, and answers the
+              Pixeltable is the backend. It stores a row for each video and the
+              TwelveLabs results, keeps them up to date as videos are added, and answers the
               API&apos;s queries.
             </p>
             <div>
               <StepCard number={1} title="Store the videos" when="Setup">
-                Each video is stored as a row, with the video file and its title,
+                Each video is stored as a row, with a reference to the video file and its title,
                 creator, and category. Those fields were attached when the video was
                 uploaded to TwelveLabs.
               </StepCard>
@@ -444,8 +448,8 @@ export default function HowItWorksPage() {
                 </div>
                 <ul className="text-xs text-[var(--text-secondary)] leading-relaxed space-y-1.5">
                   <li>
-                    Stores the videos, embeddings, and Analyze results in one place, with
-                    no separate vector database or blob store
+                    Stores the video rows, scene clips, embeddings, and Analyze results in one place, with
+                    no separate vector database
                   </li>
                   <li>Calls scene detection and the Analyze API from computed columns when you insert a video</li>
                   <li>Adds the Marengo embedding of each new scene to the index</li>
@@ -476,8 +480,10 @@ export default function HowItWorksPage() {
               heading="What runs in Pixeltable and what calls TwelveLabs"
             />
             <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-2xl">
-              The app calls TwelveLabs once for each video when you add it, and once
-              for each search to embed the search text. Recommendations use the scene
+              When you add a video, it gets one Analyze call, one Marengo embedding for
+              its title, and one Marengo embedding for each scene clip. Each search
+              makes one more call, to embed the search text or the uploaded image,
+              video, or audio file. Recommendations use the scene
               embeddings already stored in Pixeltable, so they make no TwelveLabs
               calls. When you add a video, Pixeltable only computes the new rows, so
               you pay for one video of TwelveLabs work, not the whole catalog.
@@ -491,8 +497,10 @@ export default function HowItWorksPage() {
                   Upload, embed, and analyze
                 </div>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Each video goes to TwelveLabs once, when you add it. Pixeltable stores
-                  the embeddings and tags, so the app never sends that video again.
+                  Each full video is uploaded to the TwelveLabs index once, before
+                  loading. On insert, Pixeltable sends each scene clip to the Embed API
+                  and calls Analyze with the video&apos;s asset ID. After that, the stored
+                  embeddings and tags are reused.
                 </p>
               </div>
               <div className="p-5 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-card)]">
