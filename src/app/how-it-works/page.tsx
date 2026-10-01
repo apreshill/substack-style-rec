@@ -215,9 +215,10 @@ export default function HowItWorksPage() {
         <p className="text-lg text-[var(--text-secondary)] max-w-2xl mb-6 leading-relaxed">
           An AI video discovery app with subscriptions, search, and a
           &ldquo;because you watched&hellip;&rdquo; feed. TwelveLabs models create the
-          embeddings and tags for each video. Pixeltable stores the embeddings and
-          tags in each video&apos;s row, next to a reference to the source MP4, and
-          searches the embeddings to answer every search and recommendation.
+          embeddings and tags for each video. Pixeltable stores the tags in each
+          video&apos;s row, next to a reference to the source MP4, and the scene
+          embeddings in an index, and searches the embeddings to answer every search
+          and recommendation.
           Playback streams from the TwelveLabs index.
         </p>
 
