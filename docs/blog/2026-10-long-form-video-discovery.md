@@ -20,7 +20,7 @@ Search and discovery beyond metadata are difficult to build. Titles and tags are
 
 Ranking on video content requires two capabilities.
 
-The first is understanding what happens in every scene of every video, and this is where TwelveLabs comes in. Marengo creates embeddings for video, audio, images, and text in one shared space, so a scene can be compared with a text query, an image, or another video. Pegasus generates structured attributes for each video through the Analyze API. <!-- RESEARCHED 2026-10-01: Marengo 3.0 video defaults are embedding_option [visual, audio, transcription], embedding_scope [clip, asset], embedding_type separate. The API reference sample response puts data[0] = visual, clip, 0-4.2 s, and warns the data array has no ordering guarantee. embed_video_retry (and Pixeltable's built-in embed) keep data[0], so each scene vector is likely the visual embedding of the scene's first segment only. Fix in the PR before publication: request asset scope + fused embedding and select by embedding_option/scope. Sync limit for Marengo 3.0 video is 10 minutes / 36 MB, so long scenes are accepted. -->
+The first is understanding what happens in every scene of every video, and this is where [TwelveLabs](https://www.twelvelabs.io/) comes in. Marengo creates embeddings for video, audio, images, and text in one shared space, so a scene can be compared with a text query, an image, or another video. Pegasus generates structured attributes for each video through the [Analyze API](https://www.twelvelabs.io/product/analyze).
 
 The second is keeping that understanding synced with the catalog for fast lookup, in a way that can be surfaced to users. Pixeltable covers that half. In a production application, the model output has to be computed for every scene, kept current as videos and models change, and served on every page load without a new model call. Every new feature touches all of that infrastructure: to build anything, you have to build everything. With [Pixeltable](https://www.pixeltable.com/), an open source multimodal backend, you keep the TwelveLabs output synced with the catalog, compute it on insert, and serve it to users from one application.
 
@@ -41,7 +41,7 @@ Try the [live demo](https://substack-style-rec.vercel.app): watch two or three v
 
 ### Why TwelveLabs for Long-Form Video
 
-CuratorAI uses two TwelveLabs models, Marengo 3.0 and Pegasus 1.5 at the time of writing, and the TwelveLabs video index that holds the videos:
+CuratorAI uses two TwelveLabs models, Marengo 3.0 and Pegasus 1.5 at the time of writing, and the [TwelveLabs video index](https://docs.twelvelabs.io/docs/concepts/indexes) that holds the videos:
 
 - **Marengo:** Creates embeddings from video, audio, images, and text in one shared space. A scene clip, a written phrase, a photograph, and an audio sample can all be compared directly, which lets one index serve both recommendations and search.
 - **Pegasus:** A video-to-text model that analyzes multiple modalities and can return structured JSON. It accepts videos up to two hours long, so one Analyze request covers a full episode.
@@ -51,7 +51,7 @@ CuratorAI uses two TwelveLabs models, Marengo 3.0 and Pegasus 1.5 at the time of
 
 [Pixeltable](https://github.com/pixeltable/pixeltable) is a multimodal backend. One app holds the whole backend: storage, the AI steps, search, and the API. You write it once, and the same app runs on a laptop and in production.
 
-The alternatives have you stand up and connect each of those pieces first. One option is an app backend like Supabase or Convex, with the AI processing built separately. The other is an assembled stack of Postgres, object storage, a vector database such as Pinecone, job scripts for the model calls, and an API server.
+The alternatives have you stand up and connect each of those pieces first. One option is an app backend like [Supabase](https://supabase.com/) or [Convex](https://www.convex.dev/), with the AI processing built separately. The other is an assembled stack of [Postgres](https://www.postgresql.org/), object storage, a vector database such as [Pinecone](https://www.pinecone.io/), job scripts for the model calls, and an API server.
 
 In that kind of stack, each new feature touches every system. With Pixeltable, a new feature is one addition to one backend: the AI steps you define run on every video the application inserts, and on the videos already stored when you add a step.
 
@@ -59,8 +59,8 @@ In that kind of stack, each new feature touches every system. With Pixeltable, a
 
 - A TwelveLabs API key from the [TwelveLabs Playground](https://playground.twelvelabs.io/).
 - A TwelveLabs video index that contains your videos and their metadata. <!-- TODO(blocker): load.py reads one specific index (69c37b67...). Other accounts get 403. The upload script is not in the repo. Add an upload step before publication. -->
-- Python 3.11 or later, the [uv](https://docs.astral.sh/uv/) package manager, and ffmpeg for video processing.
-- Node.js 18 or later for the Next.js frontend.
+- Python 3.11 or later, the [uv](https://docs.astral.sh/uv/) package manager, and [ffmpeg](https://ffmpeg.org/) for video processing.
+- [Node.js](https://nodejs.org/) 18 or later for the [Next.js](https://nextjs.org/) frontend.
 
 Put your key and index ID in `backend/.env.local`, then install the backend, create the tables, and load three quick-start videos:
 
@@ -200,7 +200,7 @@ uv run pxt schema diff app.py substack_rec
 uv run pxt schema update app.py substack_rec
 ```
 
-`pxt schema diff` is read-only: it lists each change and marks it as safe, destructive, or unsupported, and `pxt schema update` applies nothing destructive unless you pass `--allow-destructive`.
+[`pxt schema diff`](https://docs.pixeltable.com/overview/how-it-works) is read-only: it lists each change and marks it as safe, destructive, or unsupported, and `pxt schema update` applies nothing destructive unless you pass `--allow-destructive`.
 
 ## Step 2: Load and Explore the Tables in Python
 
@@ -245,9 +245,9 @@ For an application, `app.py` and the CLI keep the whole schema in one file that 
   - `uv run pxt service run app.py substack_rec` (local).
   - A screenshot of /docs. -->
 
-The frontend asks for data on every page: the catalog, search results, and three kinds of recommendations. CuratorAI serves the parts that are table queries through Pixeltable's `FastAPIRouter`.
+The frontend asks for data on every page: the catalog, search results, and three kinds of recommendations. CuratorAI serves the parts that are table queries through Pixeltable's [`FastAPIRouter`](https://docs.pixeltable.com/howto/deployment/serving).
 
-The ranking logic stays in plain Python on the same FastAPI app, because it isn't a single table query. It merges results from several watched videos, balances creators, and handles new viewers who have no history yet.
+The ranking logic stays in plain Python on the same [FastAPI](https://fastapi.tiangolo.com/) app, because it isn't a single table query. It merges results from several watched videos, balances creators, and handles new viewers who have no history yet.
 
 This part of the "For You" ranking fills 70% of the row from subscribed creators and 30% from new ones:
 
@@ -303,7 +303,7 @@ A template builds the explanation, not a language model, so it adds no delay and
 
 ### Search with Any Query Type
 
-The search page accepts text, an image, a video clip, or an audio file as the query. Query video files must be under 36 MB for the Embed API, so the search page accepts files up to 35 MB. <!-- TODO(verify) the 36 MB limit against the TwelveLabs Embed API docs; source today is a code comment in config.py --> Every query type reaches the same scene index through a different similarity argument: `similarity(string=...)`, `similarity(image=...)`, `similarity(video=...)`, or `similarity(audio=...)`.
+The search page accepts text, an image, a video clip, or an audio file as the query. Query video files must be under 36 MB for the [Embed API](https://www.twelvelabs.io/product/embed), so the search page accepts files up to 35 MB. <!-- TODO(verify) the 36 MB limit against the TwelveLabs Embed API docs; source today is a code comment in config.py --> Every query type reaches the same scene index through a different similarity argument: `similarity(string=...)`, `similarity(image=...)`, `similarity(video=...)`, or `similarity(audio=...)`.
 
 For example, a text search for "music culture" returns Vox Earworm videos about smooth jazz, Stravinsky, and song fade-outs, although none of their titles contains either word. Marengo matches the meaning of the query to the content of the scenes. <!-- TODO(verify) on the live demo on the day of publication; observed 2026-09-30 -->
 
@@ -312,7 +312,7 @@ Search and the four features follow one pattern. TwelveLabs turns each scene and
 ## Best Practices
 
 - **Reuse stored vectors:** when the query is already in your catalog, read its vector with `.embedding()` and pass it to `similarity(vector=...)`, which removes a model call from every request.
-- **Embed scenes, not full videos:** the application stores one Marengo vector for each clip, so the clip boundaries decide what each vector represents. Scene-length clips keep each vector focused on one subject. <!-- TODO(blocker): not true today. The stored vector is likely the visual embedding of each clip's first ~4 s segment (data[0]). Rewrite after the embed fix. -->
+- **Embed scenes, not full videos:** the application stores one Marengo vector for each clip, so the clip boundaries decide what each vector represents. Scene-length clips keep each vector focused on one subject.
 - **Tune scene detection to your content:** CuratorAI uses `fps=1`, `threshold=0.9`, and `min_scene_len=900`. A higher threshold gives fewer scenes, so there are fewer clips to embed. Check the scene count on a few videos before you embed a full catalog.
 - **Preview every schema change:** run `pxt schema diff` before `pxt schema update`, and keep destructive changes behind `--allow-destructive`.
 - **Add context as a new column:** a new attribute, such as pacing, is one more computed column that calls the Analyze API. When you add it, it runs on every stored video, because Analyze reads each video from the TwelveLabs video index.
