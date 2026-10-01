@@ -1310,7 +1310,7 @@ wheels = [
 
 [[package]]
 name = "pixeltable"
-version = "0.7.10"
+version = "0.7.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1351,7 +1351,7 @@ dependencies = [
     { name = "tzlocal" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/8e/c118f1b7dc239bbbbbb155c74865f47f40cd4e68abb794d8bfe376a66a44/pixeltable-0.7.10-py3-none-any.whl", hash = "sha256:6d9170566ec7173a774694e7ac7f3eece1a752376adbe93dd31d88849d2aef68", size = 1335918, upload-time = "2026-09-24T19:17:24.543Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/fd/dfcfd1e7c7de29c1bb16383a821b47383da394d92f38a5ebf4cf7f315db9/pixeltable-0.7.12-py3-none-any.whl", hash = "sha256:a4edff55f3476825abc2ff1e43a8453d33c013463b5d580b26b70282071d7423", size = 1343950, upload-time = "2026-09-30T18:58:32.991Z" },
 ]
 
 [[package]]
@@ -2182,7 +2182,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "opencv-python-headless", specifier = ">=4.13.0.92" },
-    { name = "pixeltable", specifier = ">=0.7.10" },
+    { name = "pixeltable", specifier = ">=0.7.12" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "scenedetect", specifier = ">=0.6.7.1" },
