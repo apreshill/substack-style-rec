@@ -1,10 +1,10 @@
 ---
-title: "Building Scene-Level Video Recommendations with TwelveLabs and Pixeltable"
-search_title: "Build Scene-Level Video Recommendations with TwelveLabs & Pixeltable"
+title: "Building Long-Form Video Discovery with TwelveLabs and Pixeltable"
+search_title: "Build Long-Form Video Discovery with TwelveLabs & Pixeltable"
 category: "Partnerships"
 byline: "Alison Hill, TBD (TwelveLabs)"
-subtitle: "Developers can build content-based discovery for long-form video by pairing TwelveLabs Marengo 3.0 and Pegasus 1.5 with Pixeltable, the multimodal backend that stores that context with the catalog and serves it to users."
-meta_description: "Build scene-level recommendations for long-form video with TwelveLabs Marengo 3.0 and Pegasus 1.5, served from Pixeltable, an open source multimodal backend."
+subtitle: "Developers can build content-based discovery for long-form video by pairing TwelveLabs Marengo and Pegasus with Pixeltable, the multimodal backend that stores that context with the catalog and serves it to users."
+meta_description: "Build long-form video discovery and search with TwelveLabs Marengo and Pegasus, kept in sync with the catalog and served from Pixeltable, a multimodal backend."
 status: "DRAFT 1. TODO notes are in HTML comments. Step 3 waits for the PR #2 serving code."
 ---
 
@@ -16,24 +16,22 @@ Creator platforms now host large catalogs of long-form video, from interviews an
 
 Discovery across creators stays shallow too, because two videos about the same idea rarely share a title or a tag. Substack TV is a recent example: its app launched in January with a "For You" row, and it lists [search and improved discovery](https://on.substack.com/p/introducing-the-substack-tv-app-now) as what's coming next.
 
-Search and discovery beyond metadata are hard because the signal is inside the video. A 40-minute episode can cover many subjects, and what is shown and said in each part rarely appears in the title or the tags.
+Search and discovery beyond metadata are difficult to build. Titles and tags are already structured fields in a database, and ranking on them takes a single query.
 
-To rank on that content, an application needs a model that can represent each part of a video and compare it with a text query, an image, or another video. This is where TwelveLabs comes in. Marengo 3.0 creates embeddings for video, audio, images, and text in one shared space, and Pegasus 1.5 generates structured attributes for each video through the Analyze API. <!-- TODO(verify with TwelveLabs): what a default Marengo 3.0 video embedding covers (fused, or visual only); the app and Pixeltable both use data[0] from embed v2 -->
+Ranking on video content requires two capabilities.
 
-Even with those models, content-based discovery is hard to put into a production application. The model output has to be computed for every scene of every video and stored next to the catalog, with each vector linked to its video.
+The first is understanding what happens in every scene of every video, and this is where TwelveLabs comes in. Marengo creates embeddings for video, audio, images, and text in one shared space, so a scene can be compared with a text query, an image, or another video. Pegasus generates structured attributes for each video through the Analyze API. <!-- RESEARCHED 2026-10-01: Marengo 3.0 video defaults are embedding_option [visual, audio, transcription], embedding_scope [clip, asset], embedding_type separate. The API reference sample response puts data[0] = visual, clip, 0-4.2 s, and warns the data array has no ordering guarantee. embed_video_retry (and Pixeltable's built-in embed) keep data[0], so each scene vector is likely the visual embedding of the scene's first segment only. Fix in the PR before publication: request asset scope + fused embedding and select by embedding_option/scope. Sync limit for Marengo 3.0 video is 10 minutes / 36 MB, so long scenes are accepted. -->
 
-That output also has to stay current as videos are added and models change, and it has to reach users on every page load without a new model call. Every new feature touches all of that infrastructure: to build anything, you have to build everything.
+The second is keeping that understanding synced with the catalog for fast lookup, in a way that can be surfaced to users. Pixeltable covers that half. In a production application, the model output has to be computed for every scene, kept current as videos and models change, and served on every page load without a new model call. Every new feature touches all of that infrastructure: to build anything, you have to build everything. With [Pixeltable](https://www.pixeltable.com/), an open source multimodal backend, you keep the TwelveLabs output synced with the catalog, compute it on insert, and serve it to users from one application.
 
-This is where Pixeltable comes in. With [Pixeltable](https://www.pixeltable.com/), an open source multimodal backend, you keep the TwelveLabs output next to the catalog, compute it on insert, and serve it to users from one application.
+Together, these two tools can power more effective long-form discovery through four features that rank videos by content instead of by title or tag:
 
-Together, these two tools can power more effective long-form discovery. Here is how they work together in four features, each of which ranks videos by what they contain, not by their titles or tags:
+- **"For You" Row Intelligence:** Recommendations built from the scenes a viewer has watched, mixing creators they follow with creators they haven't found yet.
+- **Deep Catalog Surfacing:** A creator's back catalog ranked by relevance to each viewer, so strong older videos come back into view.
+- **Cross-Creator Discovery:** Similar videos from other creators when the content matches, even if the titles and tags don't.
+- **Explainable Recommendations:** A short reason with each recommendation that names what the two videos share, such as topic, style, or tone.
 
-- **"For You" Row Intelligence:** A personalized home row built from the scenes of recently watched videos, balancing subscribed creators with unfamiliar ones.
-- **Deep Catalog Surfacing:** A creator page that ranks the back catalog by relevance to each viewer, so older videos resurface.
-- **Cross-Creator Discovery:** An Up Next list that recommends similar videos from other creators when the content matches.
-- **Explainable Recommendations:** A short "Because you watched" explanation on each recommendation that names the attributes the two videos share.
-
-Each feature is a bet that a given catalog may or may not reward. With TwelveLabs and Pixeltable, a team can build each one, test it on real videos, and change it without rebuilding the stack.
+These features follow patterns that large streaming services already use, such as personalized rows and "Because you watched" recommendations. What differs from one catalog to the next is the tuning: the mix of subscribed and new creators, the scene length, and which attributes to explain. With TwelveLabs and Pixeltable, a team can build each feature, tune it on its own videos, and change it without rebuilding the stack.
 
 This tutorial walks through CuratorAI, a working demo of all four features. By the end, you'll know how the application turns each new video into scene vectors and attributes on insert, and how it serves recommendations from them in about a second.
 
@@ -43,10 +41,10 @@ Try the [live demo](https://substack-style-rec.vercel.app): watch two or three v
 
 ### Why TwelveLabs for Long-Form Video
 
-CuratorAI uses two TwelveLabs models and the TwelveLabs video index that holds the videos:
+CuratorAI uses two TwelveLabs models, Marengo 3.0 and Pegasus 1.5 at the time of writing, and the TwelveLabs video index that holds the videos:
 
-- **Marengo 3.0:** Creates embeddings from video, audio, images, and text in one shared space. A scene clip, a written phrase, a photograph, and an audio sample can all be compared directly, which lets one index serve both recommendations and search.
-- **Pegasus 1.5:** A video-to-text model that analyzes multiple modalities and can return structured JSON. It accepts videos up to two hours long, so one Analyze request covers a full episode.
+- **Marengo:** Creates embeddings from video, audio, images, and text in one shared space. A scene clip, a written phrase, a photograph, and an audio sample can all be compared directly, which lets one index serve both recommendations and search.
+- **Pegasus:** A video-to-text model that analyzes multiple modalities and can return structured JSON. It accepts videos up to two hours long, so one Analyze request covers a full episode.
 - **The TwelveLabs video index:** Stores the full videos with their HLS streams, thumbnails, and custom metadata. CuratorAI streams playback from it and reads each video's creator, category, and upload date from it during loading. Search and recommendations don't query it: they run on Pixeltable's embedding indexes.
 
 ### Why Pixeltable for the Production App
@@ -55,7 +53,7 @@ CuratorAI uses two TwelveLabs models and the TwelveLabs video index that holds t
 
 The alternatives have you stand up and connect each of those pieces first. One option is an app backend like Supabase or Convex, with the AI processing built separately. The other is an assembled stack of Postgres, object storage, a vector database such as Pinecone, job scripts for the model calls, and an API server.
 
-In that kind of stack, each new feature touches every system. In CuratorAI, a new feature is one addition to one backend: the AI steps you define run on every video the application inserts, and on the videos already stored when you add a step.
+In that kind of stack, each new feature touches every system. With Pixeltable, a new feature is one addition to one backend: the AI steps you define run on every video the application inserts, and on the videos already stored when you add a step.
 
 ## Prerequisites
 
@@ -88,7 +86,7 @@ The backend holds the Pixeltable tables and the API. Each video is streamed to t
 Every video moves through four steps:
 
 1. **Store:** `load.py` inserts one row for each video, with its title, creator, category, HLS URL, and video file.
-2. **Compute on insert:** Pegasus 1.5 returns the topic, style, and tone. Scene detection finds the cuts, the view splits the video into one clip for each scene, and Marengo 3.0 embeds each clip.
+2. **Compute on insert:** Pegasus returns the topic, style, and tone. Scene detection finds the cuts, the view splits the video into one clip for each scene, and Marengo embeds each clip.
 3. **Answer queries:** a search embeds the query with Marengo and compares it with the stored scene vectors. A recommendation is answered from vectors that were stored at insert.
 4. **Rank and explain:** application code balances creators, limits each creator to two recommendations, and assembles the "Because you watched" explanation.
 
@@ -110,7 +108,7 @@ A long-form video usually covers many subjects, and a 40-minute interview can mo
 
 A title, or a single embedding for the whole video, blurs those subjects together, so CuratorAI embeds each scene instead.
 
-Marengo 3.0 places each scene clip in the same multimodal vector space as text, images, and audio. As a result, one scene index can answer a text search, an image upload, a video clip, or an audio sample.
+Marengo places each scene clip in the same multimodal vector space as text, images, and audio. As a result, one scene index can answer a text search, an image upload, a video clip, or an audio sample.
 
 The 25 demo videos hold about 11.6 hours of footage, split into 476 scenes. <!-- TODO(verify): 476 comes from HANDOFF.md only; count with pxt count on substack_rec/video_scenes -->
 
@@ -118,7 +116,7 @@ The 25 demo videos hold about 11.6 hours of footage, split into 476 scenes. <!--
 
 The complete schema is defined in `backend/app.py`. Each class is a table, a type annotation is a stored column, and an assignment is a computed column that runs on insert.
 
-Here is the `Videos` table, trimmed to the columns this tutorial covers:
+Here is the `Videos` table, trimmed to the columns this tutorial explains:
 
 ```python
 marengo = pxtf.twelvelabs.embed.using(model_name="marengo3.0")
@@ -139,7 +137,7 @@ class Videos(TableModel, name="videos"):
 
 `raw_attributes` calls the Analyze API once for each new video. `topic`, `style`, and `tone` read fields from that result, and `scenes` stores the scene boundaries, while the title index is the text fallback for search.
 
-`analyze_video` is a short user-defined function that calls the Analyze API. It sends the video's asset ID from the TwelveLabs video index to Pegasus 1.5, so the video isn't uploaded a second time:
+`analyze_video` is a short user-defined function that calls the Analyze API. It sends the video's asset ID from the TwelveLabs video index to Pegasus, so the video isn't uploaded a second time:
 
 ```python
 @pxt.udf(is_deterministic=False)
@@ -152,7 +150,7 @@ async def analyze_video(video_id: str) -> VideoAttributes:
     }
 ```
 
-The prompt asks for a list of topics, one of eight styles, and one of six tones. Here is part of it, which limits each answer to a fixed set of options:
+The prompt asks Pegasus for a list of topics, one of eight styles, and one of six tones. Here is part of it, which limits each answer to a fixed set of options:
 
 ```text
 style options (pick exactly one):
@@ -165,7 +163,7 @@ tone options (pick exactly one):
 - "contemplative": reflective, slow-paced, thought-provoking
 ```
 
-Fixed options keep Pegasus 1.5's attributes consistent across the whole catalog, and the explanations in Step 4 depend on that consistency.
+Fixed options keep Pegasus's attributes consistent across the whole catalog, and the explanations in Step 4 depend on that consistency.
 
 The function's return type is a `TypedDict`, and Pixeltable uses that type definition, so `raw_attributes.topic` becomes a typed column instead of untyped JSON.
 
@@ -193,7 +191,7 @@ class VideoScenes(
 
 Each row of the view is one scene clip, which is stored in Pixeltable's media store. `mode="fast"` copies the original stream without re-encoding, so each split falls on the nearest keyframe.
 
-The index embeds every clip with Marengo 3.0 when the row is inserted. `embed_video_retry` is a small wrapper that retries while TwelveLabs finishes processing an uploaded clip. Text, image, and audio queries use the same model through `marengo`.
+The index embeds every clip with Marengo when the row is inserted. `embed_video_retry` is a small wrapper that retries while TwelveLabs finishes processing an uploaded clip. Text, image, and audio queries use the same model through `marengo`.
 
 Preview the schema changes, then create the tables, view, and indexes from the command line:
 
@@ -297,7 +295,7 @@ The Up Next list on the watch page searches with the current video's stored scen
 
 ### Explainable Recommendations
 
-Each recommendation carries a short explanation built from the Pegasus 1.5 attributes of both videos. A typical line reads: "Because you watched 'How to legislate AI' · Similar interview format · Matching serious tone."
+Each recommendation carries a short explanation built from the Pegasus attributes of both videos. A typical line reads: "Because you watched 'How to legislate AI' · Similar interview format · Matching serious tone."
 
 <!-- TODO(verify): capture the exact line from the live demo; the code joins the first part with an em dash -->
 
@@ -314,7 +312,7 @@ Search and the four features follow one pattern. TwelveLabs turns each scene and
 ## Best Practices
 
 - **Reuse stored vectors:** when the query is already in your catalog, read its vector with `.embedding()` and pass it to `similarity(vector=...)`, which removes a model call from every request.
-- **Embed scenes, not full videos:** the application stores one Marengo vector for each clip, so the clip boundaries decide what each vector represents. Scene-length clips keep each vector focused on one subject.
+- **Embed scenes, not full videos:** the application stores one Marengo vector for each clip, so the clip boundaries decide what each vector represents. Scene-length clips keep each vector focused on one subject. <!-- TODO(blocker): not true today. The stored vector is likely the visual embedding of each clip's first ~4 s segment (data[0]). Rewrite after the embed fix. -->
 - **Tune scene detection to your content:** CuratorAI uses `fps=1`, `threshold=0.9`, and `min_scene_len=900`. A higher threshold gives fewer scenes, so there are fewer clips to embed. Check the scene count on a few videos before you embed a full catalog.
 - **Preview every schema change:** run `pxt schema diff` before `pxt schema update`, and keep destructive changes behind `--allow-destructive`.
 - **Add context as a new column:** a new attribute, such as pacing, is one more computed column that calls the Analyze API. When you add it, it runs on every stored video, because Analyze reads each video from the TwelveLabs video index.
@@ -324,11 +322,13 @@ Search and the four features follow one pattern. TwelveLabs turns each scene and
 
 ## What This Approach Makes Possible
 
-Content-based discovery no longer has to be a large bet made up front. A team can try scene-level recommendations on its own catalog and see whether older videos and new creators start to surface.
+Content-based discovery no longer has to be a large investment made up front. A team can try all four features on its own catalog and see whether older videos and new creators start to surface.
 
-Marengo 3.0 finds the scenes that titles miss, Pegasus 1.5 gives each video attributes that a recommendation can cite, and Pixeltable keeps both next to the catalog and serves them.
+Marengo finds the scenes that titles miss, Pegasus gives each video attributes that a recommendation can cite, and Pixeltable keeps both next to the catalog and serves them.
 
-As the team learns, it can change the features. Each change is an edit to `app.py`, a schema diff, and a schema update, not a project across five systems.
+Discovery is not a one-time build. New videos arrive every day and need the same scene embeddings and attributes as the rest of the catalog. TwelveLabs keeps releasing better models, so stored vectors and attributes eventually need to be recomputed. The people building the product also think of new signals to rank on. A team might decide that pacing matters, so that a viewer who likes slow, reflective interviews sees more of them.
+
+Every one of those changes costs engineering time and compute, so its scope matters. With Pixeltable, each new video gets the same steps on insert. A model or feature change is an edit to `app.py` and a schema update: `pxt schema diff` shows what will change before anything runs, and results already computed stay in place until you choose to rerun them.
 
 The same backend can do more than this demo shows. A route that takes an upload could store a new video, run the Analyze call and the scene embeddings, and return the new context to the frontend, for many users at once.
 
