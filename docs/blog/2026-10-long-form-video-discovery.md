@@ -8,7 +8,7 @@ meta_description: "Build long-form video discovery and search with TwelveLabs Ma
 status: "DRAFT 1. TODO notes are in HTML comments. Step 3 waits for the PR #2 serving code."
 ---
 
-[Code on GitHub](https://github.com/TODO/substack-style-rec) <!-- TODO: choose apreshill/ or mrnkim/ -->
+[Code on GitHub](https://github.com/mrnkim/substack-style-rec)
 
 ## Introduction
 
@@ -20,7 +20,7 @@ Search and discovery beyond metadata are difficult to build. Titles and tags are
 
 Ranking on video content requires two capabilities.
 
-The first is understanding what happens in every scene of every video, and this is where [TwelveLabs](https://www.twelvelabs.io/) comes in. Marengo creates embeddings for video, audio, images, and text in one shared space, so a scene can be compared with a text query, an image, or another video. Pegasus generates structured attributes for each video through the [Analyze API](https://www.twelvelabs.io/product/analyze).
+The first is understanding what happens in every scene of every video, and this is where [TwelveLabs](https://www.twelvelabs.io/) comes in. [Marengo](https://www.twelvelabs.io/marengo) creates embeddings for video, audio, images, and text in one shared space, so a scene can be compared with a text query, an image, or another video. [Pegasus](https://www.twelvelabs.io/pegasus) generates structured attributes for each video through the [Analyze API](https://www.twelvelabs.io/product/analyze).
 
 The second is keeping that understanding synced with the catalog for fast lookup, in a way that can be surfaced to users. Pixeltable covers that half. In a production application, the model output has to be computed for every scene, kept current as videos and models change, and served on every page load without a new model call. Every new feature touches all of that infrastructure: to build anything, you have to build everything. With [Pixeltable](https://www.pixeltable.com/), an open source multimodal backend, you keep the TwelveLabs output synced with the catalog, compute it on insert, and serve it to users from one application.
 
@@ -336,7 +336,7 @@ Because the whole backend is one file plus a CLI that reports its results, a cod
 
 ## Resources
 
-- [CuratorAI source code](https://github.com/TODO/substack-style-rec): the complete application, including the backend schema, the loading script, and the frontend.
+- [CuratorAI source code](https://github.com/mrnkim/substack-style-rec): the complete application, including the backend schema, the loading script, and the frontend.
 - [CuratorAI live demo](https://substack-style-rec.vercel.app): the four features on 25 long-form videos from 10 creators.
 - [Marengo](https://docs.twelvelabs.io/docs/concepts/models/marengo): the TwelveLabs embedding model for video, text, image, and audio.
 - [Pegasus](https://docs.twelvelabs.io/docs/concepts/models/pegasus): the TwelveLabs video language model behind the Analyze API.
