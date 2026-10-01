@@ -85,7 +85,7 @@ The backend holds the Pixeltable tables and the API. Each video is streamed to t
 
 Every video moves through four steps:
 
-1. **Store:** `load.py` inserts one row for each video, with its title, creator, category, HLS URL, and video file.
+1. **Store:** `load.py` inserts one row for each video, with its title, creator, category, HLS URL, and a reference to its video file.
 2. **Compute on insert:** Pegasus returns the topic, style, and tone. Scene detection finds the cuts, the view splits the video into one clip for each scene, and Marengo embeds each clip.
 3. **Answer queries:** a search embeds the query with Marengo and compares it with the stored scene vectors. A recommendation is answered from vectors that were stored at insert.
 4. **Rank and explain:** application code balances creators, limits each creator to two recommendations, and assembles the "Because you watched" explanation.
